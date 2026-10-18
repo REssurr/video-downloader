@@ -15,6 +15,19 @@
 
 ---
 
+## 下载
+
+去 **[Releases](../../releases/latest)** 下载：
+
+| 文件 | 是什么 | 需要吗 |
+|---|---|---|
+| `video-downloader-0.1.0-portable.exe` | 程序本体，105 MB，免安装 | **必须** |
+| `video-downloader-extension-0.1.0.zip` | 浏览器扩展（解压后直接加载） | 可选，装了才能「跟随页面」 |
+
+运行要求：**Windows 10 / 11 x64**。exe 没有代码签名，首次运行可能弹 SmartScreen「Windows 已保护你的电脑」→ 点「更多信息 → 仍要运行」。
+
+只要 exe 就能下载直链文件；扩展只在想「自动跟随浏览器当前页面」时才需要（见第二节）。
+
 ## 一、开箱即用（不需要装任何东西）
 
 1. 在 [Releases](../../releases) 下载 `video-downloader-0.1.0-portable.exe`。
@@ -31,7 +44,8 @@ GitHub 用户 / 开发者通常可以接受手动装扩展，普通用户看到"
 
 > Chrome / Edge 没有让程序静默安装扩展的通道，所以只能手动做一次，之后一直有效。
 
-1. 从 Releases 下载 `video-downloader-extension-0.1.0.zip` 并解压（如果你有源码，也可以直接用仓库里的 `extension/` 目录）。
+1. 从 Releases 下载 `video-downloader-extension-0.1.0.zip` 并解压，得到 `video-downloader-extension` 文件夹。
+   （如果你有源码：**先跑一次 `pnpm build`** 生成 `extension/build/`，再加载仓库里的 `extension/` 目录；只 clone 不打构建的话里面只有 `manifest.json`，浏览器会报"清单文件缺失/不可读"。）
 2. 打开扩展管理页：
    - Edge：地址栏输入 `edge://extensions`
    - Chrome：地址栏输入 `chrome://extensions`
@@ -57,9 +71,11 @@ GitHub 用户 / 开发者通常可以接受手动装扩展，普通用户看到"
 
 ## 四、从源码构建
 
-需要 Node.js 22+ 与 pnpm。
+需要 **Node.js 22+** 与 **pnpm**。
 
 ```powershell
+git clone https://github.com/REssurr/video-downloader.git
+cd video-downloader
 pnpm install
 pnpm dev        # 构建并启动
 pnpm start      # 只启动（需先 pnpm build）
@@ -67,6 +83,11 @@ pnpm typecheck  # TypeScript 类型检查
 pnpm test       # 全量测试（会先构建测试产物）
 pnpm dist:win   # 出 Windows 便携单文件 exe，产物在 release/
 ```
+
+clone 下来**只有源码**：`node_modules/`、`dist/`、`release/`、`extension/build/` 都不在仓库里（被 `.gitignore` 排除）。所以：
+
+- 想从浏览器加载扩展 → 先 `pnpm build`，`extension/build/` 才会出现；
+- 想要 exe → 跑 `pnpm dist:win`，产物在 `release/`。
 
 "拿真东西验证"的两个脚本（可选）：
 
