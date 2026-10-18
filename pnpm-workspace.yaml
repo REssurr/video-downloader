@@ -1,0 +1,5 @@
+allowBuilds:
+  esbuild: true
+  electron: true
+  # 只在打 Squirrel.Windows 安装包时用；本仓库出的是 NSIS 便携版，跳过它的构建脚本。
+  electron-winstaller: false

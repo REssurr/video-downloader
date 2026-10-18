@@ -1,0 +1,40 @@
+# electron-builder 配置：出 Windows 便携单文件 exe（双击即用，不需要安装）
+# 产物落 release/，已在 .gitignore 里排除
+appId: com.ressurr.video-downloader
+productName: VideoDownloader
+copyright: Copyright © 2026 REssurr
+
+directories:
+  output: release
+  buildResources: build
+
+# 进 asar 的只有运行必需的东西：主进程 + 渲染层 + package.json
+files:
+  - dist/**
+  - package.json
+  - LICENSE
+
+# 不进 asar、运行时按真实路径读取的东西：浏览器扩展与图标
+extraResources:
+  - from: extension
+    to: extension
+  - from: build/tray.png
+    to: tray.png
+  - from: build/icon-256.png
+    to: icon-256.png
+
+asar: true
+
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  icon: build/icon.png
+  # 便携版不带安装向导，所以在文件名里写清版本
+  legalTrademarks: ''
+
+portable:
+  artifactName: video-downloader-${version}-portable.${ext}
+  # 运行时把自己解到 %TEMP% 的这个子目录；写死名字，便于排障时能找到
+  unpackDirName: video-downloader

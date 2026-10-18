@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "视频下载器 · 浏览器桥",
+  "version": "0.1.0",
+  "description": "把当前标签页里正在播放的视频交给桌面版「视频下载器」：真实下载、清晰度列表、分离音视频合并都在桌面端完成。",
+  "permissions": ["tabs", "scripting", "storage"],
+  "host_permissions": ["http://127.0.0.1/*", "https://*/*", "http://*/*"],
+  "background": {
+    "service_worker": "build/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["build/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_title": "视频下载器 · 浏览器桥"
+  }
+}

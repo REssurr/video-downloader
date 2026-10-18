@@ -1,0 +1,34 @@
+{
+  "name": "video-downloader",
+  "version": "0.1.0",
+  "private": true,
+  "description": "独立的 Windows 视频下载器：拖动或粘贴链接即可下载，配合浏览器扩展跟随当前标签页里的视频",
+  "type": "module",
+  "main": "dist/main.cjs",
+  "author": "REssurr",
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "start": "electron .",
+    "dev": "node esbuild.mjs && electron .",
+    "test": "node esbuild.test.mjs && node --test \"test/*.test.mjs\"",
+    "test:e2e": "node esbuild.test.mjs && node scripts/e2e-extension.mjs",
+    "verify:mux": "node esbuild.test.mjs && node scripts/verify-mux.mjs",
+    "typecheck": "tsc --noEmit",
+    "fixture": "node scripts/serve-fixture.mjs",
+    "dist:win": "node esbuild.mjs && electron-builder --win portable",
+    "dist:dir": "node esbuild.mjs && electron-builder --win dir"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.5",
+    "@types/node": "^24.19.0",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.17.0",
+    "esbuild": "^0.25.12",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^5.9.3"
+  },
+  "license": "MIT"
+}
