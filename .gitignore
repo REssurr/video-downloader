@@ -1,0 +1,21 @@
+# 依赖与构建产物：可重新生成，不进仓库
+node_modules/
+dist/
+lib/
+extension/build/
+release/
+out/
+
+# 二进制大文件与临时文件
+tools/ffmpeg.exe
+*.part
+*.tmp
+
+# 系统与日志
+*.log
+.DS_Store
+Thumbs.db
+
+# 本地私密配置
+.env
+*.local
