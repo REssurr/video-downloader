@@ -1,6 +1,6 @@
 {
   "name": "video-downloader",
-  "version": "0.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "独立的 Windows 视频下载器：拖动或粘贴链接即可下载，配合浏览器扩展跟随当前标签页里的视频",
   "type": "module",

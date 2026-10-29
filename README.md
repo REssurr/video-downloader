@@ -28,8 +28,8 @@
 
 | 文件 | 是什么 | 需要吗 |
 |---|---|---|
-| `video-downloader-0.1.0-portable.exe` | 程序本体，105 MB，免安装 | **必须** |
-| `video-downloader-extension-0.1.0.zip` | 浏览器扩展（解压后直接加载） | 可选，装了才能「跟随页面」 |
+| `video-downloader-1.1.1-portable.exe` | 程序本体，105 MB，免安装 | **必须** |
+| `video-downloader-extension-1.1.1.zip` | 浏览器扩展（解压后直接加载） | 可选，装了才能「跟随页面」 |
 
 运行要求：**Windows 10 / 11 x64**。exe 没有代码签名，首次运行可能弹 SmartScreen「Windows 已保护你的电脑」→ 点「更多信息 → 仍要运行」。
 
@@ -37,7 +37,7 @@
 
 ## 一、开箱即用（不需要装任何东西）
 
-1. 在 [Releases](../../releases) 下载 `video-downloader-0.1.0-portable.exe`。
+1. 在 [Releases](../../releases) 下载 `video-downloader-1.1.1-portable.exe`。
 2. 双击运行（免安装；第一次启动要解压到临时目录，会慢几秒）。
 3. 把媒体直链粘贴到输入框回车，或者拖进窗口，就开始下载。
 
@@ -51,7 +51,7 @@ GitHub 用户 / 开发者通常可以接受手动装扩展，普通用户看到"
 
 > Chrome / Edge 没有让程序静默安装扩展的通道，所以只能手动做一次，之后一直有效。
 
-1. 从 Releases 下载 `video-downloader-extension-0.1.0.zip` 并解压，得到 `video-downloader-extension` 文件夹。
+1. 从 Releases 下载 `video-downloader-extension-1.1.1.zip` 并解压，得到 `video-downloader-extension` 文件夹。
    （如果你有源码：**先跑一次 `pnpm build`** 生成 `extension/build/`，再加载仓库里的 `extension/` 目录；只 clone 不打构建的话里面只有 `manifest.json`，浏览器会报"清单文件缺失/不可读"。）
 2. 打开扩展管理页：
    - Edge：地址栏输入 `edge://extensions`
@@ -141,7 +141,7 @@ pnpm fixture    # 起本地验收夹具页 http://127.0.0.1:5399/page.html
 
 ```powershell
 $env:VD_START_LOG = "$env:TEMP\vd-boot.log"
-.\release\video-downloader-0.1.0-portable.exe
+.\release\video-downloader-1.1.1-portable.exe
 Get-Content $env:VD_START_LOG
 ```
 
