@@ -126,6 +126,15 @@ export const api = {
   /** Cancel one job. */
   cancelDownload: (jobId: string) => call<{ cancelled: true }>('download.cancel', { jobId }),
 
+  /**
+   * Retry one FAILED download.
+   *
+   * The Host runs the new attempt on the other carrier than the one that failed,
+   * and answers with a new job id: the failed row stays in the list as evidence
+   * of what went wrong, and the new row is the attempt the user can watch.
+   */
+  retryDownload: (jobId: string) => call<StartDownloadResult>('download.retry', { jobId }),
+
   /** Ask the desktop to show one job's file (or the download directory). */
   revealDownload: (jobId: string) => call<{ path: string }>('download.reveal', { jobId }),
 

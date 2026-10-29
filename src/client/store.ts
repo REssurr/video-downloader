@@ -132,6 +132,13 @@ export interface DownloaderStore {
   setGuestSource(source: GuestSource | undefined): void
   /** Cancel a job. */
   cancel(jobId: string): void
+  /**
+   * Retry a failed job on the other carrier.
+   *
+   * The Host creates a new job for it; the failed row is left alone, so a second
+   * failure still has the first one beside it to compare.
+   */
+  retry(jobId: string): Promise<void>
   /** Show a job's file (or the download directory) in the file manager. */
   reveal(jobId: string): Promise<void>
   /** Run the extension diagnostics for the panel's 诊断 drawer. */
@@ -521,6 +528,18 @@ export function createStore(): DownloaderStore {
         if (current !== undefined) set({ state: { ...current, jobs } })
       })
       return answer
+    },
+
+    async retry(jobId) {
+      await guarded(async () => {
+        const answer = await api.retryDownload(jobId)
+        // A conflict is a question, not a start: nothing new exists to refresh
+        // for, and the row keeps showing the failure until the file is answered.
+        if (answer.conflict !== undefined) return
+        const { jobs } = await api.jobs()
+        const current = snapshot.state
+        if (current !== undefined) set({ state: { ...current, jobs } })
+      })
     },
 
     carrierAdvice(option) {

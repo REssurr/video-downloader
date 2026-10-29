@@ -36,7 +36,7 @@ import { applyMediaPolicy } from '../probe/policy.js'
 import { ApiFailure, createDispatcher, type DownloaderServices, type ProbeRecord } from '../routes.js'
 import { createExtensionHub } from './extension-hub.js'
 import { EXT_WS_PATH, EVENTS_PATH, API_PREFIX, PORT_RANGE, UPLOAD_PATH } from '../shared/wire.js'
-import type { DownloaderConfig } from '../shared/types.js'
+import type { DownloadConflict, DownloaderConfig, VideoEntry, VideoOption } from '../shared/types.js'
 import type { ExtensionState, ExtensionTab } from '../shared/extension.js'
 import { legacyConfig } from './legacy-migration.js'
 
@@ -206,6 +206,90 @@ export async function startHostServer(options: HostOptions): Promise<Host> {
   /** The extension's current tab, when it has one. */
   const activeTab = (): ExtensionTab | undefined => hub.state().tab
 
+  /** The file one probe record offers under a `formatId` (and optional `entryId`). */
+  const pickOption = (record: ProbeRecord, formatId: string, entryId?: string): { entry: VideoEntry; option: VideoOption } => {
+    const entry = entryId === undefined
+      ? record.entries.find(candidate => candidate.options.some(option => option.id === formatId))
+      : record.entries.find(candidate => candidate.id === entryId)
+    const option = entry?.options.find(candidate => candidate.id === formatId)
+    if (entry === undefined || option === undefined) throw new Error('找不到所选清晰度，请重新探测')
+    return { entry, option }
+  }
+
+  /**
+   * Start one probed file, however the request reached us.
+   *
+   * `download.start` and `download.retry` differ only in the carrier they name;
+   * the conflict question and the extension handshake live HERE so a retried job
+   * takes exactly the same path through them as a fresh one.
+   */
+  const beginDownload = async (input: {
+    readonly record: ProbeRecord
+    readonly entry: VideoEntry
+    readonly option: VideoOption
+    readonly onConflict?: 'overwrite' | 'keep'
+    readonly carrier?: 'guest'
+  }): Promise<{ jobId?: string; conflict?: DownloadConflict; guestToken?: string }> => {
+    const { record, entry, option, onConflict, carrier } = input
+    const merge = await muxerKeeper.status()
+    if (option.audioUrl !== undefined && option.audioUrl !== '' && !merge.available) {
+      throw new ApiFailure('bad-request', `这一档要把视频轨与音频轨合并成一个 mp4，但本机没有找到 ffmpeg.exe（${merge.reason ?? '未找到'}）`)
+    }
+    const referer = entry.url === record.url ? originOf(record.url) : record.url
+    const request = {
+      url: entry.url,
+      option,
+      title: entry.title,
+      downloadDir: config.downloadDir,
+      filenameTemplate: config.filenameTemplate,
+      ...(referer === undefined ? {} : { referer }),
+      ...(carrier === 'guest' ? { carrier: 'guest' as const } : {}),
+    }
+    const existing = await engine.inspect(request)
+    if (existing !== undefined && onConflict === undefined) {
+      const normalize = (path: string): string => path.replace(/\\/g, '/').toLowerCase()
+      const previous = engine.list().find(job => job.outputPath !== undefined && normalize(job.outputPath) === normalize(existing.path))
+      const previousOption = previous === undefined
+        ? undefined
+        : probes.get(previous.url)?.entries
+          .flatMap(candidate => candidate.options)
+          .find(candidate => candidate.id === previous.formatId)
+      return {
+        conflict: {
+          path: existing.path,
+          existingBytes: existing.bytes,
+          ...(existing.modifiedAtMs === undefined ? {} : { existingModifiedAt: existing.modifiedAtMs }),
+          ...(previous === undefined ? {} : { existingTitle: previous.title, existingUrl: previous.url }),
+          ...(option.height === undefined ? {} : { incomingHeight: option.height }),
+          ...(previousOption?.height === undefined ? {} : { existingHeight: previousOption.height }),
+        },
+      }
+    }
+    const handle = engine.start({
+      ...request,
+      ...(onConflict === undefined ? {} : { onConflict }),
+      ...(existing === undefined ? {} : { existingPath: existing.path }),
+    })
+    // A page-carried job is fetched BY the extension, which already has the
+    // browser's cookies and IP. The Host mints the token and hands the whole job
+    // over; the bytes arrive on `/upload` like any page push.
+    if (handle.guest !== undefined) {
+      if (!hub.connected()) {
+        engine.cancel(handle.id)
+        throw new ApiFailure('bad-request', '浏览器扩展未连接，这次「扩展下载」无法开始；点「本机直连」或恢复扩展后重试')
+      }
+      hub.notify('fetchMedia', {
+        token: handle.guest.token,
+        url: entry.url,
+        ...(referer === undefined ? {} : { referer }),
+      })
+    }
+    return {
+      jobId: handle.id,
+      ...(handle.guest === undefined ? {} : { guestToken: handle.guest.token }),
+    }
+  }
+
   const services: DownloaderServices = {
     version: options.version,
     config: () => config,
@@ -271,68 +355,44 @@ export async function startHostServer(options: HostOptions): Promise<Host> {
     async startDownload({ url, formatId, entryId, onConflict, carrier }) {
       const record = probes.get(url)
       if (record === undefined) throw new Error('请先探测该网址')
-      const entry = entryId === undefined
-        ? record.entries.find(candidate => candidate.options.some(option => option.id === formatId))
-        : record.entries.find(candidate => candidate.id === entryId)
-      const option = entry?.options.find(candidate => candidate.id === formatId)
-      if (entry === undefined || option === undefined) throw new Error('找不到所选清晰度，请重新探测')
-      const merge = await muxerKeeper.status()
-      if (option.audioUrl !== undefined && option.audioUrl !== '' && !merge.available) {
-        throw new ApiFailure('bad-request', `这一档要把视频轨与音频轨合并成一个 mp4，但本机没有找到 ffmpeg.exe（${merge.reason ?? '未找到'}）`)
-      }
-      const referer = entry.url === url ? originOf(url) : url
-      const request = {
-        url: entry.url,
-        option,
-        title: entry.title,
-        downloadDir: config.downloadDir,
-        filenameTemplate: config.filenameTemplate,
-        ...(referer === undefined ? {} : { referer }),
-        ...(carrier === 'guest' ? { carrier: 'guest' as const } : {}),
-      }
-      const existing = await engine.inspect(request)
-      if (existing !== undefined && onConflict === undefined) {
-        const normalize = (path: string): string => path.replace(/\\/g, '/').toLowerCase()
-        const previous = engine.list().find(job => job.outputPath !== undefined && normalize(job.outputPath) === normalize(existing.path))
-        const previousOption = previous === undefined
-          ? undefined
-          : probes.get(previous.url)?.entries
-            .flatMap(candidate => candidate.options)
-            .find(candidate => candidate.id === previous.formatId)
-        return {
-          conflict: {
-            path: existing.path,
-            existingBytes: existing.bytes,
-            ...(existing.modifiedAtMs === undefined ? {} : { existingModifiedAt: existing.modifiedAtMs }),
-            ...(previous === undefined ? {} : { existingTitle: previous.title, existingUrl: previous.url }),
-            ...(option.height === undefined ? {} : { incomingHeight: option.height }),
-            ...(previousOption?.height === undefined ? {} : { existingHeight: previousOption.height }),
-          },
-        }
-      }
-      const handle = engine.start({
-        ...request,
+      return await beginDownload({
+        record,
+        ...pickOption(record, formatId, entryId),
         ...(onConflict === undefined ? {} : { onConflict }),
-        ...(existing === undefined ? {} : { existingPath: existing.path }),
+        ...(carrier === undefined ? {} : { carrier }),
       })
-      // A page-carried job is fetched BY the extension, which already has the
-      // browser's cookies and IP. The Host mints the token and hands the whole job
-      // over; the bytes arrive on `/upload` like any page push.
-      if (handle.guest !== undefined) {
-        if (!hub.connected()) {
-          engine.cancel(handle.id)
-          throw new ApiFailure('bad-request', '浏览器扩展未连接，这次「扩展下载」无法开始；点「本机直连」或恢复扩展后重试')
+    },
+    async retryDownload(jobId) {
+      const job = engine.list().find(candidate => candidate.id === jobId)
+      if (job === undefined) throw new ApiFailure('not-found', '找不到这个任务（它可能已经不在最近列表里）')
+      if (job.status !== 'failed') throw new ApiFailure('bad-request', '只有失败的下载才需要重新下载')
+      // A job carries the ENTRY's URL while the probe map is keyed by the PAGE's,
+      // so the record is found by its option rather than by its key: for every
+      // guest job the two URLs differ, and a URL lookup would never match.
+      let found: { record: ProbeRecord; entry: VideoEntry } | undefined
+      for (const record of probes.values()) {
+        const entry = record.entries.find(candidate =>
+          candidate.url === job.url && candidate.options.some(option => option.id === job.formatId))
+        if (entry !== undefined) {
+          found = { record, entry }
+          break
         }
-        hub.notify('fetchMedia', {
-          token: handle.guest.token,
-          url: entry.url,
-          ...(referer === undefined ? {} : { referer }),
-        })
       }
-      return {
-        jobId: handle.id,
-        ...(handle.guest === undefined ? {} : { guestToken: handle.guest.token }),
+      if (found === undefined) {
+        throw new ApiFailure('not-found', '这个任务对应的页面信息已经过期：在浏览器里重新打开该页面，再下载一次')
       }
+      const { option } = pickOption(found.record, job.formatId)
+      // The point of a manual retry is the channel that was NOT tried: a reset
+      // connection or a cookie-gated CDN is often invisible to the other carrier.
+      // A guest attempt needs a live extension; without one, repeating the direct
+      // carrier is the only thing that can work at all.
+      const useGuest = job.carrier === 'direct' && hub.connected()
+      return await beginDownload({
+        record: found.record,
+        entry: found.entry,
+        option,
+        ...(useGuest ? { carrier: 'guest' as const } : {}),
+      })
     },
     cancelJob(jobId) { engine.cancel(jobId) },
     async revealDownload(jobId) {

@@ -140,6 +140,15 @@ export interface DownloaderServices {
     readonly onConflict?: 'overwrite' | 'keep'
     readonly carrier?: 'guest'
   }) => Promise<{ readonly jobId?: string; readonly conflict?: DownloadConflict; readonly guestToken?: string }>
+  /**
+   * Restart one FAILED download, on the carrier it did not use last time.
+   *
+   * A new job is created rather than the old record being revived, so the list
+   * keeps the evidence of the first failure next to the second attempt. Only a
+   * `failed` job is eligible: a cancel is the user's own decision and a finished
+   * file does not need downloading twice.
+   */
+  readonly retryDownload: (jobId: string) => Promise<{ readonly jobId?: string; readonly conflict?: DownloadConflict; readonly guestToken?: string }>
   /** Cancel one job. */
   readonly cancelJob: (jobId: string) => void
   /** Show one job's file (or the download directory) in the file manager. */
@@ -349,6 +358,12 @@ export function createDispatcher(services: DownloaderServices): Dispatcher {
             })
             return { ok: true, value: started }
           }
+
+          case 'download.retry':
+            // Only the job id: the Host owns what a retry means (another carrier,
+            // the same option) so the client cannot ask for a loop of the same
+            // failing channel.
+            return { ok: true, value: await services.retryDownload(requireString(payload, 'jobId')) }
 
           case 'download.cancel': {
             services.cancelJob(requireString(payload, 'jobId'))

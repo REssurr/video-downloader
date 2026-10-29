@@ -155,9 +155,31 @@ export function jobPercent(job: JobView): number | undefined {
   return percentOf(job.receivedBytes, job.totalBytes)
 }
 
+/**
+ * A failure that looks like the transport dropped rather than the file being
+ * refused: worth one more click on the other carrier.
+ */
+const TRANSPORT_FAILURE = /ECONNRESET|ECONNREFUSED|ECONNABORTED|EPIPE|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|socket hang up|fetch failed|aborted|连接|网络/i
+
+/** The carrier a job ran on, in the row's own words. */
+export function carrierName(carrier: JobView['carrier']): string {
+  return carrier === 'guest' ? '扩展下载' : '本机直连'
+}
+
+/** What the retry line under a failed row promises. */
+export function retryHint(job: JobView): string {
+  const dropped = TRANSPORT_FAILURE.test(job.error ?? '')
+  return dropped
+    ? '网络连接被中断了，点「重新下载」再试一次（会自动换一条下载通道）'
+    : '点「重新下载」再试一次（会自动换一条下载通道）'
+}
+
 /** One job row: what it is, how far along, and the three things one can do to it. */
 function JobRow({ job, store }: { job: JobView; store: DownloaderStore }): ReactNode {
   const percent = jobPercent(job)
+  // Only for the duration of the request that creates the replacement job; the
+  // new row appears in the list, so the button never has to stay busy for long.
+  const [retrying, setRetrying] = useState(false)
   const tone = job.status === 'failed'
     ? 'var(--dsw-alias-state-error-primary, #f2a1a1)'
     : job.status === 'done'
@@ -194,6 +216,30 @@ function JobRow({ job, store }: { job: JobView; store: DownloaderStore }): React
         </div>
       )}
       <div style={{ fontSize: '11px', color: tone, wordBreak: 'break-all' }}>{jobDetail(job)}</div>
+      {/*
+        A failed row is the only one with something left to do, and the thing is
+        this: run the SAME file on the other carrier. It sits under the row's own
+        words (which is where the reason is) rather than in a toolbar somewhere,
+        because "this one failed, what now" is a question about this row.
+      */}
+      {job.status === 'failed' && (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            disabled={retrying}
+            onClick={() => {
+              setRetrying(true)
+              void store.retry(job.id).finally(() => { setRetrying(false) })
+            }}
+            style={buttonStyle(retrying)}
+          >
+            {retrying ? '正在重试…' : '重新下载'}
+          </button>
+          <span style={{ flex: 1, minWidth: 0, fontSize: '11px', color: MUTED }}>
+            {carrierName(job.carrier)}失败 · {retryHint(job)}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

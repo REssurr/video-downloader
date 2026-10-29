@@ -115,6 +115,15 @@ export interface JobView {
   readonly title: string
   readonly formatId: string
   readonly source: ProbeSource
+  /**
+   * Which side carried this job's bytes: the app itself (`direct`) or the browser
+   * extension (`guest`).
+   *
+   * The panel needs it to say WHICH channel failed, and the retry action needs it
+   * to pick the other one — a failure that one carrier can see through (a reset
+   * connection, a cookie-gated CDN) is often invisible to the other.
+   */
+  readonly carrier: 'guest' | 'direct'
   readonly status: JobStatus
   readonly receivedBytes: number
   readonly totalBytes?: number

@@ -220,6 +220,11 @@ export interface JobView {
   readonly title: string
   readonly formatId: string
   readonly source: ProbeSource
+  /**
+   * Which side carried this job's bytes: the app itself (`direct`) or the browser
+   * extension (`guest`). A retry runs on the other one.
+   */
+  readonly carrier: 'guest' | 'direct'
   readonly status: JobStatus
   /** Bytes written so far. */
   readonly receivedBytes: number

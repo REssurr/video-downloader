@@ -531,6 +531,8 @@ interface MutableJob {
   title: string
   formatId: string
   source: ProbeSource
+  /** Which side actually carries the bytes; decided once, at `start`. */
+  carrier: CarrierKind
   status: JobStatus
   receivedBytes: number
   totalBytes?: number
@@ -549,6 +551,7 @@ function toView(job: MutableJob): JobView {
     title: job.title,
     formatId: job.formatId,
     source: job.source,
+    carrier: job.carrier,
     status: job.status,
     receivedBytes: job.receivedBytes,
     ...(job.totalBytes === undefined ? {} : { totalBytes: job.totalBytes }),
@@ -1123,6 +1126,7 @@ export function createDownloadEngine(deps: DownloadDeps, options: EngineOptions)
         title: request.title,
         formatId: request.option.id,
         source: request.option.source,
+        carrier: resolveCarrier(request),
         status: 'queued',
         receivedBytes: 0,
       }
